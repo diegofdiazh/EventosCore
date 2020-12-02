@@ -7,6 +7,7 @@ using EventosCore.Data;
 using EventosCore.Data.Entities;
 using EventosCore.Models.Responses;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -31,23 +32,25 @@ namespace EventosCore.Controllers
         }
         [HttpGet]
         [Route("GetCiudades")]
+        [EnableCors("AllowAll")]
         public IActionResult GetCiudades()
         {
             try
             {
                 Logger.LogInformation("Inicia obtencion de aeropuertos");
-                var aeropuertos = _db.Aeropuertos.Where(c => !string.IsNullOrEmpty(c.Lata)).ToList();
+                var eventtosCiudades = _db.Eventos.ToList();
+                var aeropuertos = eventtosCiudades.Where(c => !string.IsNullOrEmpty(c.Aeropuertos.Lata)).OrderBy(c => c.Aeropuertos.CiudadUbicacin).ToList();
                 List<ResponseCiudades> responseAeropuertos = new List<ResponseCiudades>();
                 foreach (var item in aeropuertos)
                 {
-                    if (responseAeropuertos.FirstOrDefault(c => c.CiudadUbicacion == item.CiudadUbicacin) == null)
+                    if (responseAeropuertos.FirstOrDefault(c => c.CiudadUbicacion == item.Aeropuertos.CiudadUbicacin) == null)
                     {
                         responseAeropuertos.Add(new ResponseCiudades
                         {
-                            CiudadUbicacion = item.CiudadUbicacin,
-                            Iata = item.Lata,
+                            CiudadUbicacion = item.Aeropuertos.CiudadUbicacin,
+                            Iata = item.Aeropuertos.Lata,
                             Id = item.Id,
-                            Concatenado = $"{item.CiudadUbicacin}[{item.Lata}]"
+                            Concatenado = $"{item.Aeropuertos.CiudadUbicacin}[{item.Aeropuertos.Lata}]"
                         });
                     }
                 }
@@ -64,6 +67,7 @@ namespace EventosCore.Controllers
 
         [HttpGet]
         [Route("GetEventos")]
+        [EnableCors("AllowAll")]
         public IActionResult GetEventos(string ciudad)
         {
             try
@@ -71,7 +75,7 @@ namespace EventosCore.Controllers
                 Logger.LogInformation("Inicia obtencion de eventos");
                 if (string.IsNullOrEmpty(ciudad))
                 {
-                    var eventos = _db.Eventos.ToList();
+                    var eventos = _db.Eventos.OrderBy(c => c.FechaEvento).ToList();
                     List<ResponceEventosCiudades> responceEventosCiudades = new List<ResponceEventosCiudades>();
                     foreach (var item in eventos)
                     {
@@ -125,7 +129,46 @@ namespace EventosCore.Controllers
         }
 
         [HttpGet]
+        [Route("GetEventosTop10")]
+        [EnableCors("AllowAll")]
+        public IActionResult GetEventosTop10()
+        {
+            try
+            {
+                Logger.LogInformation("Inicia obtencion de eventos");
+
+                var eventos = _db.Eventos.OrderBy(c => c.FechaEvento).Take(10).ToList();
+                List<ResponceEventosCiudades> responceEventosCiudades = new List<ResponceEventosCiudades>();
+                foreach (var item in eventos)
+                {
+                    responceEventosCiudades.Add(new ResponceEventosCiudades
+                    {
+                        tourEventId = item.Id,
+                        description = item.Descripcion,
+                        eventCity = item.Aeropuertos.CiudadUbicacin,
+                        eventDate = item.FechaEvento,
+                        imgLocal = item.ImgLocal,
+                        imgVisitante = item.ImgVisitante,
+                        shortDescription = item.DescripcionCorta,
+                        value = item.Precio,
+                        concatenated = $"{item.Aeropuertos.CiudadUbicacin}[{item.Aeropuertos.Lata}]"
+
+                    });
+                }
+                Logger.LogInformation(responceEventosCiudades.ToString());
+                return Ok(responceEventosCiudades);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Excepcion generada en GetAeropuertos: " + ex.Message);
+                return StatusCode(500, "Ocurrio un error");
+                throw;
+            }
+        }
+
+        [HttpGet]
         [Route("{eventoId:int}", Name = "GetEvento")]
+        [EnableCors("AllowAll")]
         public IActionResult GetEvento(int eventoId)
         {
             try
